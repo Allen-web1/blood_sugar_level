@@ -16,6 +16,7 @@
         getAI,
         getGenerativeModel,
         GoogleAIBackend,
+        ThinkingLevel,
       } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-ai.js";
       import {
         getAuth,
@@ -64,6 +65,13 @@
       const ai = getAI(app, { backend: new GoogleAIBackend() });
       const tutorModel = getGenerativeModel(ai, {
         model: "gemini-3.6-flash",
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 1500,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.MINIMAL,
+          },
+        },
         systemInstruction: `
 너는 고등학교 생명과학 수업의 AI 튜터다.
 현재 수업 주제는 혈당량 조절과 항상성이다.
@@ -155,10 +163,6 @@
           if (!message) throw new Error("질문 내용이 없습니다.");
           const chat = tutorModel.startChat({
             history: contents.slice(0, -1),
-            generationConfig: {
-              temperature: 0.4,
-              maxOutputTokens: 500,
-            },
           });
           const result = await chat.sendMessage(message);
           const reply = result.response.text().trim();
