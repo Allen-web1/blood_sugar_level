@@ -18,6 +18,8 @@
         getFirestore,
         collection,
         addDoc,
+        deleteDoc,
+        doc,
         getDocs,
         onSnapshot,
         orderBy,
@@ -68,6 +70,9 @@
         const date = data.createdAt?.toDate?.();
         const log = data.log || "";
         const quiz = parseQuizFromLog(log);
+        const report = data.report || "";
+        const reportScore = report.trim() ? 10 : 0;
+        const hasQuizRecord = Boolean(quiz.q1Answer || quiz.q2Answer);
         return {
           id: snapshot.id,
           time: date
@@ -75,12 +80,15 @@
             : "저장 중…",
           sid: data.studentId || "",
           name: data.studentName || "",
-          score: Number(data.score) || 0,
+          score: hasQuizRecord
+            ? quiz.q1Score + quiz.q2Score + reportScore
+            : Number(data.score) || 0,
           q1Answer: quiz.q1Answer,
           q2Answer: quiz.q2Answer,
           q1Score: quiz.q1Score,
           q2Score: quiz.q2Score,
-          report: data.report || "",
+          reportScore,
+          report,
           question: data.question || "",
           feedback: data.feedback || "",
           log,
@@ -123,6 +131,10 @@
           );
           return result.docs.map(toRow);
         },
+        async deleteSubmission(id) {
+          await deleteDoc(doc(db, "submissions", id));
+          return { ok: true };
+        },
         listenRows(onRows, onError) {
           return onSnapshot(
             query(submissionsRef, orderBy("createdAt", "desc")),
@@ -135,7 +147,9 @@
             .data;
         },
         async clearSubmissions() {
-          return (await httpsCallable(functions, "clearSubmissions")({})).data;
+          const result = await getDocs(submissionsRef);
+          await Promise.all(result.docs.map((item) => deleteDoc(item.ref)));
+          return { ok: true, deleted: result.size };
         },
       };
     </script>
@@ -682,7 +696,7 @@
 
             <div>
               <label class="block text-[14px] font-semibold mb-2"
-                >탐구 결론 (음성 피드백 원리 포함)</label
+                >탐구 결론 (음성 피드백 원리 포함, 10점)</label
               >
               <textarea
                 id="studentReport"
@@ -851,10 +865,11 @@
                 <tr>
                   <th class="p-4">제출 시간</th>
                   <th class="p-4">학번/이름</th>
-                  <th class="p-4">퀴즈</th>
-                  <th class="p-4">탐구 결론</th>
+                  <th class="p-4">형성평가</th>
+                  <th class="p-4">탐구 결론 (10점)</th>
                   <th class="p-4">학생 질문</th>
                   <th class="p-4">AI 피드백</th>
+                  <th class="p-4">관리</th>
                 </tr>
               </thead>
               <tbody
@@ -1389,7 +1404,8 @@
 
         const q1Score = q1 === "1" ? 5 : 0;
         const q2Score = q2 === "2" ? 5 : 0;
-        const score = q1Score + q2Score;
+        const reportScore = 10;
+        const score = q1Score + q2Score + reportScore;
 
         btnSubmit.disabled = true;
         btnSubmit.innerText = "제출 중...";
@@ -1404,7 +1420,7 @@
             score: score,
             log: [`[QUIZ:q1=${q1};q2=${q2}]`, ...logLines].join(" / "),
           });
-          showToast(`제출이 완료되었습니다. 형성평가 점수: ${score}/10점`, "success");
+          showToast(`제출이 완료되었습니다. 총점: ${score}/20점`, "success");
           document.getElementById("studentReport").value = "";
           document.getElementById("studentQuestion").value = "";
           document
@@ -1518,16 +1534,16 @@
           teacherRows.length + "명";
         if (teacherRows.length === 0) {
           tbody.innerHTML =
-            '<tr><td colspan="6" class="p-8 text-center text-hp-steel">아직 제출된 결과가 없습니다.</td></tr>';
+            '<tr><td colspan="7" class="p-8 text-center text-hp-steel">아직 제출된 결과가 없습니다.</td></tr>';
           return;
         }
 
         tbody.innerHTML = teacherRows
           .map((row) => {
             const scoreColor =
-              Number(row.score) === 10 ? "text-hp-primary" : "text-hp-error";
+              Number(row.score) === 20 ? "text-hp-primary" : "text-hp-error";
             const quizDetail = row.q1Answer || row.q2Answer
-              ? `<div class="font-bold ${scoreColor}">${escapeHTML(row.score)}/10점</div>
+              ? `<div class="font-bold ${scoreColor}">총점 ${escapeHTML(row.score)}/20점</div>
                  <div class="mt-1 text-[12px] font-normal text-hp-charcoal whitespace-nowrap">
                    Q1: ${escapeHTML(row.q1Answer || "미응답")}번 (${escapeHTML(row.q1Score)}/5점)<br>
                    Q2: ${escapeHTML(row.q2Answer || "미응답")}번 (${escapeHTML(row.q2Score)}/5점)
@@ -1541,9 +1557,10 @@
                     <td class="p-4 text-[13px] whitespace-nowrap">${escapeHTML(row.time)}</td>
                     <td class="p-4 font-semibold whitespace-nowrap">${escapeHTML(row.sid)}<br><span class="font-normal">${escapeHTML(row.name)}</span></td>
                     <td class="p-4">${quizDetail}</td>
-                    <td class="p-4 text-[13px] leading-relaxed min-w-[240px]">${escapeHTML(row.report)}</td>
+                    <td class="p-4 text-[13px] leading-relaxed min-w-[240px]"><div class="font-bold text-hp-primary mb-1">${escapeHTML(row.reportScore)}/10점</div>${escapeHTML(row.report)}</td>
                     <td class="p-4 text-[13px] leading-relaxed min-w-[180px]">${escapeHTML(row.question) || "-"}</td>
                     <td class="p-4 min-w-[220px]">${feedback}</td>
+                    <td class="p-4"><button data-id="${escapeHTML(row.id)}" data-student="${escapeHTML(`${row.sid} ${row.name}`)}" class="teacher-delete text-[12px] text-hp-error border border-hp-error px-3 py-1 rounded whitespace-nowrap">삭제</button></td>
                 </tr>`;
           })
           .join("");
@@ -1551,6 +1568,23 @@
         document.querySelectorAll(".teacher-feedback").forEach((button) => {
           button.addEventListener("click", () => createTeacherFeedback(button));
         });
+        document.querySelectorAll(".teacher-delete").forEach((button) => {
+          button.addEventListener("click", () => deleteTeacherSubmission(button));
+        });
+      }
+
+      async function deleteTeacherSubmission(button) {
+        if (!confirm(`${button.dataset.student} 학생의 제출 기록을 삭제할까요?`)) return;
+        button.disabled = true;
+        button.innerText = "삭제 중...";
+        try {
+          await (await getFirebaseBridge()).deleteSubmission(button.dataset.id);
+          showToast("학생 제출 기록을 삭제했습니다.", "success");
+        } catch (err) {
+          showToast("삭제 실패: " + err.message, "error");
+          button.disabled = false;
+          button.innerText = "삭제";
+        }
       }
 
       async function createTeacherFeedback(button) {
@@ -1571,7 +1605,7 @@
         const quote = (value) =>
           `"${String(value == null ? "" : value).replace(/"/g, '""')}"`;
         let csv =
-          "제출시간,학번,이름,Q1답안,Q1점수,Q2답안,Q2점수,형성평가총점,탐구결론,학생질문,AI피드백,행동기록\n";
+          "제출시간,학번,이름,Q1답안,Q1점수,Q2답안,Q2점수,탐구결론점수,총점,탐구결론,학생질문,AI피드백,행동기록\n";
         teacherRows
           .slice()
           .reverse()
@@ -1585,6 +1619,7 @@
                 row.q1Score,
                 quote(row.q2Answer),
                 row.q2Score,
+                row.reportScore,
                 row.score,
                 quote(row.report),
                 quote(row.question),
