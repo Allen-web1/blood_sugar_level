@@ -62,6 +62,10 @@
           sid: data.studentId || "",
           name: data.studentName || "",
           score: Number(data.score) || 0,
+          q1Answer: String(data.q1Answer || ""),
+          q2Answer: String(data.q2Answer || ""),
+          q1Score: Number(data.q1Score) || 0,
+          q2Score: Number(data.q2Score) || 0,
           report: data.report || "",
           question: data.question || "",
           feedback: data.feedback || "",
@@ -77,6 +81,10 @@
             studentId: String(payload.studentId || "").trim(),
             studentName: String(payload.studentName || "").trim(),
             score: Number(payload.score) || 0,
+            q1Answer: String(payload.q1Answer || ""),
+            q2Answer: String(payload.q2Answer || ""),
+            q1Score: Number(payload.q1Score) || 0,
+            q2Score: Number(payload.q2Score) || 0,
             report: String(payload.report || "").trim(),
             question: String(payload.question || "").trim(),
             log: String(payload.log || ""),
@@ -595,16 +603,16 @@
               <div class="quiz-q">
                 <p class="text-[16px] font-semibold mb-3">
                   Q1. 식사를 통해 혈당량이 상승했을 때, 혈당을 낮추기 위해
-                  분비되는 호르몬과 분비 장소는?
+                  분비되는 호르몬과 분비 장소는? (5점)
                 </p>
                 <div class="flex flex-wrap gap-4">
                   <label class="flex items-center gap-2"
-                    ><input type="radio" name="q1" value="1" /> 글루카곤
-                    (간)</label
+                    ><input type="radio" name="q1" value="1" /> 인슐린
+                    (이자)</label
                   >
                   <label class="flex items-center gap-2"
-                    ><input type="radio" name="q1" value="2" /> 인슐린
-                    (이자)</label
+                    ><input type="radio" name="q1" value="2" /> 글루카곤
+                    (간)</label
                   >
                   <label class="flex items-center gap-2"
                     ><input type="radio" name="q1" value="3" /> 에피네프린
@@ -615,7 +623,7 @@
               <div class="quiz-q">
                 <p class="text-[16px] font-semibold mb-3">
                   Q2. 제2형 당뇨병 환자가 탄수화물을 섭취했을 때 나타나는
-                  현상으로 가장 적절한 것은?
+                  현상으로 가장 적절한 것은? (5점)
                 </p>
                 <div class="flex flex-col gap-2">
                   <label class="flex items-center gap-2"
@@ -1364,9 +1372,14 @@
           return;
         }
 
-        let score = 0;
-        if (q1 === "2") score += 50;
-        if (q2 === "2") score += 50;
+        if (!q1 || !q2) {
+          showToast("형성평가 Q1과 Q2에 모두 답해주세요.", "error");
+          return;
+        }
+
+        const q1Score = q1 === "1" ? 5 : 0;
+        const q2Score = q2 === "2" ? 5 : 0;
+        const score = q1Score + q2Score;
 
         btnSubmit.disabled = true;
         btnSubmit.innerText = "제출 중...";
@@ -1379,9 +1392,13 @@
             report: report,
             question: question,
             score: score,
+            q1Answer: q1,
+            q2Answer: q2,
+            q1Score: q1Score,
+            q2Score: q2Score,
             log: logLines.join(" / "),
           });
-          showToast("제출이 완료되었습니다.", "success");
+          showToast(`제출이 완료되었습니다. 형성평가 점수: ${score}/10점`, "success");
           document.getElementById("studentReport").value = "";
           document.getElementById("studentQuestion").value = "";
           document
@@ -1502,14 +1519,22 @@
         tbody.innerHTML = teacherRows
           .map((row) => {
             const scoreColor =
-              Number(row.score) === 100 ? "text-hp-primary" : "text-hp-error";
+              Number(row.score) === 10 ? "text-hp-primary" : "text-hp-error";
+            const quizDetail = row.q1Answer || row.q2Answer
+              ? `<div class="font-bold ${scoreColor}">${escapeHTML(row.score)}/10점</div>
+                 <div class="mt-1 text-[12px] font-normal text-hp-charcoal whitespace-nowrap">
+                   Q1: ${escapeHTML(row.q1Answer || "미응답")}번 (${escapeHTML(row.q1Score)}/5점)<br>
+                   Q2: ${escapeHTML(row.q2Answer || "미응답")}번 (${escapeHTML(row.q2Score)}/5점)
+                 </div>`
+              : `<div class="font-bold ${scoreColor}">${escapeHTML(row.score)}점</div>
+                 <div class="mt-1 text-[12px] font-normal text-hp-charcoal">이전 제출 기록</div>`;
             const feedback = row.feedback
               ? `<p class="text-[13px] bg-hp-cloud p-2 rounded">${escapeHTML(row.feedback)}</p><button data-id="${row.id}" class="teacher-feedback mt-2 text-[12px] underline">다시 생성</button>`
               : `<button data-id="${row.id}" class="teacher-feedback text-[12px] border border-hp-primary text-hp-primary font-bold px-3 py-1 rounded">피드백 생성</button>`;
             return `<tr class="hover:bg-hp-cloud">
                     <td class="p-4 text-[13px] whitespace-nowrap">${escapeHTML(row.time)}</td>
                     <td class="p-4 font-semibold whitespace-nowrap">${escapeHTML(row.sid)}<br><span class="font-normal">${escapeHTML(row.name)}</span></td>
-                    <td class="p-4 font-bold ${scoreColor} whitespace-nowrap">${escapeHTML(row.score)}점</td>
+                    <td class="p-4">${quizDetail}</td>
                     <td class="p-4 text-[13px] leading-relaxed min-w-[240px]">${escapeHTML(row.report)}</td>
                     <td class="p-4 text-[13px] leading-relaxed min-w-[180px]">${escapeHTML(row.question) || "-"}</td>
                     <td class="p-4 min-w-[220px]">${feedback}</td>
@@ -1540,7 +1565,7 @@
         const quote = (value) =>
           `"${String(value == null ? "" : value).replace(/"/g, '""')}"`;
         let csv =
-          "제출시간,학번,이름,퀴즈점수,탐구결론,학생질문,AI피드백,행동기록\n";
+          "제출시간,학번,이름,Q1답안,Q1점수,Q2답안,Q2점수,형성평가총점,탐구결론,학생질문,AI피드백,행동기록\n";
         teacherRows
           .slice()
           .reverse()
@@ -1550,6 +1575,10 @@
                 quote(row.time),
                 quote(row.sid),
                 quote(row.name),
+                quote(row.q1Answer),
+                row.q1Score,
+                quote(row.q2Answer),
+                row.q2Score,
                 row.score,
                 quote(row.report),
                 quote(row.question),
