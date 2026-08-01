@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>혈당량 조절 탐구 - 학생용</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        hp: {
+                            primary: '#024ad8',
+                            primaryDeep: '#0e3191',
+                            primaryBright: '#296ef9',
+                            ink: '#1a1a1a',
+                            inkSoft: '#292929',
+                            canvas: '#ffffff',
+                            cloud: '#f7f7f7',
+                            fog: '#e8e8e8',
+                            steel: '#c2c2c2',
+                            charcoal: '#3d3d3d',
+                            error: '#b3262b'
+                        }
+                    },
+                    boxShadow: {
+                        soft: '0 2px 8px rgba(26, 26, 26, 0.08)',
+                        modal: '0 8px 24px rgba(26, 26, 26, 0.12)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f7f7f7; color: #1a1a1a; }
+        .hp-chevron-left { position: absolute; left: 0; top: 0; bottom: 0; width: 24px; background: #024ad8; clip-path: polygon(0 0, 100% 0, 0 100%); }
+        .hp-chevron-right { position: absolute; right: 0; top: 0; bottom: 0; width: 24px; background: #024ad8; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f7f7f7; }
+        ::-webkit-scrollbar-thumb { background: #c2c2c2; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #636363; }
+        input[type="checkbox"], input[type="radio"] { accent-color: #024ad8; width: 1.25rem; height: 1.25rem; cursor: pointer; }
+        input[type="range"] { accent-color: #024ad8; cursor: pointer; }
+        .page-hidden { display: none !important; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center w-full">
+
+    <div id="studentApp" class="w-full flex flex-col flex-1 relative">
+        <!-- 상단 헤더 -->
+        <div class="w-full bg-hp-canvas border-b border-hp-fog relative overflow-hidden">
+            <div class="hp-chevron-left hidden md:block"></div>
+            <div class="hp-chevron-right hidden md:block"></div>
+            <div class="max-w-[1366px] mx-auto px-6 md:px-12 py-8 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <p class="text-[14px] text-hp-charcoal font-semibold tracking-[0.7px] uppercase mb-2">고등 생명과학 항상성 탐구</p>
+                    <h1 class="text-[32px] md:text-[44px] font-medium leading-[1.0] text-hp-ink tracking-tight">혈당량 조절 시뮬레이터</h1>
+                </div>
+                <button onclick="location.reload()" class="bg-hp-canvas text-hp-ink border border-hp-ink rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[14px] px-6 py-2 hover:bg-hp-cloud transition-colors">
+                    처음으로
+                </button>
+            </div>
+        </div>
+
+        <main class="w-full max-w-[1366px] mx-auto p-4 md:p-8 flex-1 flex flex-col">
+
+            <!-- 단계별 탭 -->
+            <div class="flex flex-wrap gap-2 mb-8 justify-center border-b border-hp-fog pb-6">
+                <button onclick="switchTab('intro')" id="tab-intro" class="bg-hp-ink text-white rounded-full px-6 py-2 text-[16px] font-medium transition-colors">1. 도입</button>
+                <button onclick="switchTab('explore')" id="tab-explore" class="bg-hp-canvas text-hp-ink hover:bg-hp-cloud rounded-full px-6 py-2 text-[16px] font-medium transition-colors">2. 탐색 및 적용</button>
+                <button onclick="switchTab('summary')" id="tab-summary" class="bg-hp-canvas text-hp-ink hover:bg-hp-cloud rounded-full px-6 py-2 text-[16px] font-medium transition-colors">3. 정리</button>
+            </div>
+
+            <!-- [1] 도입 -->
+            <div id="stageIntro" class="flex-1 flex flex-col items-center max-w-4xl mx-auto w-full gap-8">
+                <div class="w-full bg-hp-canvas rounded-[16px] shadow-soft p-8">
+                    <h2 class="text-[24px] font-medium text-hp-ink mb-6">🎯 생체 데이터로 문제 만나기</h2>
+
+                    <div class="w-full aspect-video bg-hp-ink rounded-[8px] overflow-hidden relative mb-6 shadow-sm border border-hp-fog">
+                         <iframe class="absolute top-0 left-0 w-full h-full" src="https://www.youtube.com/embed/uhA-nt5AXeo" title="학습 영상" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+
+                    <div class="bg-hp-cloud p-6 rounded-[8px] mb-6 flex flex-col md:flex-row gap-6 items-center">
+                        <div class="flex-1 text-[16px] text-hp-charcoal leading-relaxed">
+                            <p class="mb-4">우리가 밥을 먹거나 격렬한 운동을 할 때, 우리 몸 안에서는 어떤 일이 벌어질까요?</p>
+                            <p><b>[자료] 운동 전후 심박수 변화</b><br>
+                            스마트워치(웨어러블 센서)로 측정한 결과, 휴식 중일 때는 분당 70회이던 심박수가 달리기 후 분당 130회로 급격히 증가했습니다.</p>
+                        </div>
+                        <div class="w-32 h-32 bg-white rounded-full shadow-sm flex items-center justify-center text-hp-primary text-4xl font-bold border-4 border-hp-primary/20">
+                            💓
+                        </div>
+                    </div>
+
+                    <h3 class="text-[16px] font-semibold text-hp-ink mb-3">Q. 왜 우리 몸은 상황에 따라 심박수나 혈당량을 조절해야 할까요? 변화의 까닭을 예상해 보세요.</h3>
+                    <textarea id="introAnswer" class="w-full bg-white border border-hp-fog rounded-[4px] p-4 focus:outline-none focus:border-hp-primary resize-none text-[16px]" rows="3" placeholder="예: 에너지가 많이 필요하기 때문에..."></textarea>
+
+                    <div class="mt-6 flex justify-end">
+                        <button onclick="switchTab('explore')" class="bg-hp-primary text-white rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[14px] px-8 py-3 hover:bg-hp-primaryDeep transition-colors">
+                            시뮬레이터 탐색하기 →
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [2] 탐색 및 적용 -->
+            <div id="stageExplore" class="page-hidden grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
+
+                <div class="lg:col-span-4 flex flex-col gap-6">
+                    <div class="bg-hp-canvas rounded-[16px] p-6 shadow-soft border border-hp-fog">
+                        <h2 class="text-[20px] font-medium text-hp-ink mb-4">신체 상태 (중복 선택)</h2>
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-3 p-3 bg-hp-cloud rounded-[4px] hover:bg-hp-fog transition cursor-pointer">
+                                <input type="checkbox" id="condNormal" value="normal" checked>
+                                <span class="text-[16px] text-hp-ink font-medium">정상</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-3 bg-hp-cloud rounded-[4px] hover:bg-hp-fog transition cursor-pointer">
+                                <input type="checkbox" id="condType1" value="type1">
+                                <span class="text-[16px] text-hp-ink font-medium">제1형 당뇨 (인슐린 부족)</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-3 bg-hp-cloud rounded-[4px] hover:bg-hp-fog transition cursor-pointer">
+                                <input type="checkbox" id="condType2" value="type2">
+                                <span class="text-[16px] text-hp-ink font-medium">제2형 당뇨 (인슐린 저항성)</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-3 bg-hp-cloud rounded-[4px] hover:bg-hp-fog transition cursor-pointer">
+                                <input type="checkbox" id="condFasting" value="fasting">
+                                <span class="text-[16px] text-hp-ink font-medium">공복 상태</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-hp-canvas rounded-[16px] p-6 shadow-soft border border-hp-fog">
+                        <h2 class="text-[20px] font-medium text-hp-ink mb-4">변인 조작</h2>
+
+                        <div class="mb-6">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-[16px] font-semibold text-hp-ink">식사하기 (영양소 섭취)</h3>
+                                <span id="displayFood" class="bg-hp-ink text-white text-[12px] px-2 py-1 rounded-[4px] font-bold">보통</span>
+                            </div>
+                            <input type="range" id="sliderFood" min="10" max="100" value="50" step="10" class="w-full mb-3">
+                            <div class="grid grid-cols-2 gap-2 mb-3">
+                                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="foodType" value="carb" checked><span class="text-[14px]">탄수화물</span></label>
+                                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="foodType" value="protein"><span class="text-[14px]">단백질</span></label>
+                                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="foodType" value="fat"><span class="text-[14px]">지방</span></label>
+                                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="foodType" value="veg"><span class="text-[14px]">채소</span></label>
+                            </div>
+                            <button id="btnEat" class="w-full bg-hp-canvas border border-hp-primary text-hp-primary rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[14px] h-[44px] hover:bg-[#ebf3ff] transition-colors">
+                                식사하기
+                            </button>
+                        </div>
+
+                        <hr class="border-hp-fog mb-6">
+
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-[16px] font-semibold text-hp-ink">운동하기 (에너지 소모)</h3>
+                                <span id="displayExercise" class="bg-hp-ink text-white text-[12px] px-2 py-1 rounded-[4px] font-bold">보통</span>
+                            </div>
+                            <input type="range" id="sliderExercise" min="10" max="100" value="50" step="10" class="w-full mb-3">
+                            <div class="grid grid-cols-2 gap-2 mb-3">
+                                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="exType" value="cardio" checked><span class="text-[14px]">유산소</span></label>
+                                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="exType" value="weight"><span class="text-[14px]">무산소(근력)</span></label>
+                            </div>
+                            <button id="btnExercise" class="w-full bg-hp-canvas border border-hp-primary text-hp-primary rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[14px] h-[44px] hover:bg-[#ebf3ff] transition-colors">
+                                운동하기
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-hp-canvas rounded-[16px] p-6 shadow-soft h-[200px] flex flex-col border border-hp-fog">
+                        <h2 class="text-[20px] font-medium text-hp-ink mb-4">행동 기록 (Log)</h2>
+                        <div id="actionLog" class="flex-1 overflow-y-auto space-y-2 text-[14px] text-hp-charcoal"></div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-8 flex flex-col gap-6">
+                    <div class="bg-hp-canvas rounded-[16px] p-6 shadow-soft border border-hp-fog relative w-full h-[500px] flex flex-col">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-[24px] font-medium text-hp-ink">혈당 및 호르몬 그래프</h2>
+                            <div class="flex gap-2 items-center">
+                                <div class="text-[18px] font-medium text-hp-charcoal font-mono bg-hp-cloud px-3 py-1 rounded-[4px]" id="timeDisplay">00:00</div>
+                                <button id="btnToggleSim" class="bg-hp-ink text-white rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[12.6px] px-4 py-2 hover:bg-hp-inkSoft transition-colors">시작</button>
+                                <button id="btnReset" class="bg-hp-canvas text-hp-ink border border-hp-steel rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[12.6px] px-4 py-2 hover:bg-hp-cloud transition-colors">초기화</button>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 relative w-full">
+                            <canvas id="bloodSugarChart"></canvas>
+                            <div id="startOverlay" class="absolute inset-0 bg-white/70 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-[8px]">
+                                <button id="btnOverlayStart" class="bg-hp-primary text-white rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[16px] px-8 py-4 hover:bg-hp-primaryDeep shadow-soft transition-transform hover:scale-105">
+                                    ▶ 시뮬레이션 시작하기
+                                </button>
+                                <p class="mt-4 text-hp-charcoal text-[14px]">우측 하단의 AI 튜터에게 힌트를 얻을 수 있습니다.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button onclick="switchTab('summary')" class="bg-hp-ink text-white rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[14px] px-8 py-3 hover:bg-hp-inkSoft transition-colors whitespace-nowrap">
+                            탐구 정리하기 →
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [3] 정리 -->
+            <div id="stageSummary" class="page-hidden flex flex-col items-center max-w-5xl mx-auto w-full gap-8">
+
+                <div class="w-full bg-hp-canvas rounded-[16px] shadow-soft p-8 border border-hp-fog">
+                    <h2 class="text-[24px] font-medium text-hp-ink mb-6">📝 학습 점검 (형성평가)</h2>
+
+                    <div class="space-y-6">
+                        <div class="quiz-q">
+                            <p class="text-[16px] font-semibold mb-3">Q1. 식사를 통해 혈당량이 상승했을 때, 혈당을 낮추기 위해 분비되는 호르몬과 분비 장소는?</p>
+                            <div class="flex flex-wrap gap-4">
+                                <label class="flex items-center gap-2"><input type="radio" name="q1" value="1"> 글루카곤 (간)</label>
+                                <label class="flex items-center gap-2"><input type="radio" name="q1" value="2"> 인슐린 (이자)</label>
+                                <label class="flex items-center gap-2"><input type="radio" name="q1" value="3"> 에피네프린 (부신)</label>
+                            </div>
+                        </div>
+                        <div class="quiz-q">
+                            <p class="text-[16px] font-semibold mb-3">Q2. 제2형 당뇨병 환자가 탄수화물을 섭취했을 때 나타나는 현상으로 가장 적절한 것은?</p>
+                            <div class="flex flex-col gap-2">
+                                <label class="flex items-center gap-2"><input type="radio" name="q2" value="1"> 인슐린이 전혀 분비되지 않는다.</label>
+                                <label class="flex items-center gap-2"><input type="radio" name="q2" value="2"> 인슐린은 분비되지만 표적 세포가 반응하지 않아 혈당이 안 떨어진다.</label>
+                                <label class="flex items-center gap-2"><input type="radio" name="q2" value="3"> 글루카곤이 과다 분비되어 혈당이 오히려 낮아진다.</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w-full bg-hp-ink rounded-[16px] p-8 shadow-soft text-white flex flex-col gap-6">
+                    <div>
+                        <h2 class="text-[32px] font-medium leading-[1.0] mb-2">성찰 일지 및 결과 제출</h2>
+                        <p class="text-[16px] text-hp-steel">시뮬레이터에서 관찰한 내용을 바탕으로 최종 결론을 작성하세요.</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" id="studentId" placeholder="학번 (예: 20101)" class="bg-hp-canvas text-hp-ink rounded-[4px] p-4 text-[16px] border-none focus:outline-none focus:ring-2 focus:ring-hp-primary">
+                        <input type="text" id="studentName" placeholder="이름 (예: 홍길동)" class="bg-hp-canvas text-hp-ink rounded-[4px] p-4 text-[16px] border-none focus:outline-none focus:ring-2 focus:ring-hp-primary">
+                    </div>
+
+                    <div>
+                        <label class="block text-[14px] font-semibold mb-2">탐구 결론 (음성 피드백 원리 포함)</label>
+                        <textarea id="studentReport" rows="3" placeholder="예: 탄수화물을 섭취하면 혈당량이 상승하고, 이에 따라..." class="bg-hp-canvas text-hp-ink rounded-[4px] p-4 text-[16px] border-none focus:outline-none focus:ring-2 focus:ring-hp-primary w-full resize-none"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-[14px] font-semibold mb-2">선생님께 질문하기 (선택 사항)</label>
+                        <textarea id="studentQuestion" rows="2" placeholder="탐구 중 이해가 안 되는 부분이나 추가로 궁금한 점을 적어주세요." class="bg-hp-canvas text-hp-ink rounded-[4px] p-4 text-[16px] border-none focus:outline-none focus:ring-2 focus:ring-hp-primary w-full resize-none"></textarea>
+                    </div>
+
+                    <button id="btnSubmit" class="bg-hp-primary text-white rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[14px] h-[44px] hover:bg-hp-primaryDeep transition-colors w-full md:w-auto md:self-end px-8 disabled:opacity-50">
+                        선생님께 제출하기
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- AI 튜터 -->
+        <div id="chatbotContainer" class="fixed bottom-6 right-6 w-80 bg-hp-canvas border border-hp-fog rounded-[16px] shadow-modal hidden flex-col z-50 overflow-hidden">
+            <div class="bg-hp-ink text-white p-4 flex justify-between items-center">
+                <h3 class="font-medium text-[16px]">생명과학 AI 튜터</h3>
+                <button id="closeChat" class="text-hp-steel hover:text-white">&times;</button>
+            </div>
+            <div id="chatHistory" class="p-4 h-64 overflow-y-auto bg-white text-[14px] space-y-3 flex flex-col">
+                <div class="bg-hp-cloud text-hp-ink p-3 rounded-tr-[16px] rounded-br-[16px] rounded-bl-[16px] self-start max-w-[85%] shadow-sm">
+                    안녕하세요! 시뮬레이션을 하다가 막히는 부분이 있다면 질문해 주세요.
+                </div>
+            </div>
+            <div class="p-3 border-t border-hp-fog bg-hp-cloud flex gap-2">
+                <input type="text" id="chatInput" class="flex-1 bg-hp-canvas text-hp-ink border border-hp-steel rounded-[4px] px-3 py-2 text-[14px] focus:outline-none focus:border-hp-primary" placeholder="질문을 입력하세요...">
+                <button id="btnChatSend" class="bg-hp-primary text-white px-4 py-2 rounded-[4px] font-semibold text-[14px] tracking-[0.7px] uppercase hover:bg-hp-primaryDeep transition-colors">전송</button>
+            </div>
+        </div>
+
+        <button id="btnOpenChat" class="fixed bottom-6 right-6 bg-hp-ink text-white rounded-[16px] px-6 py-4 shadow-modal font-semibold text-[14px] uppercase tracking-[0.7px] hover:bg-hp-inkSoft transition-transform hover:scale-105 z-40 flex gap-2 items-center">
+            <span>💬 AI 튜터 질문하기</span>
+        </button>
+    </div>
+
+    <div id="toastContainer" class="fixed top-6 right-6 z-50 flex flex-col gap-2"></div>
+
+    <script>
+        /* ===== 여기만 바꾸면 됩니다 ===== */
+        const API_URL = "https://script.google.com/macros/s/AKfycbw0pV-rIizf2HPoTcPL24GtHkQAFkacoNKanFN5LDYOk7XmhgnQCc3VEladaXPfVPJn/exec";   // .../exec 로 끝나는 주소
+        /* ================================ */
+
+        // Apps Script 호출 공통 함수
+        // Content-Type을 text/plain으로 보내야 CORS 프리플라이트가 발생하지 않습니다.
+        async function callAPI(payload) {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+            return data;
+        }
+
+        // === 탭 내비게이션 ===
+        const tabs = ['intro', 'explore', 'summary'];
+        function switchTab(target) {
+            tabs.forEach(t => {
+                const btn = document.getElementById('tab-' + t);
+                const stage = document.getElementById('stage' + t.charAt(0).toUpperCase() + t.slice(1));
+                if (t === target) {
+                    btn.className = "bg-hp-ink text-white rounded-full px-6 py-2 text-[16px] font-medium transition-colors shadow-sm";
+                    stage.classList.remove('page-hidden');
+                } else {
+                    btn.className = "bg-hp-canvas text-hp-ink hover:bg-hp-cloud rounded-full px-6 py-2 text-[16px] font-medium transition-colors";
+                    stage.classList.add('page-hidden');
+                }
+            });
+            if (target === 'explore' && chart) setTimeout(() => chart.resize(), 100);
+        }
+
+        // === 시뮬레이터 ===
+        const chartColors = {
+            normal: { glucose: '#024ad8', insulin: '#296ef9', glucagon: '#636363' },
+            type1: { glucose: '#b3262b', insulin: '#ff5050' },
+            type2: { glucose: '#356373', insulin: '#7fadbe' },
+            fasting: { glucose: '#1a1a1a', glucagon: '#c2c2c2' }
+        };
+
+        const displayFood = document.getElementById('displayFood');
+        const displayExercise = document.getElementById('displayExercise');
+        const sliderFood = document.getElementById('sliderFood');
+        const sliderExercise = document.getElementById('sliderExercise');
+        const btnToggleSim = document.getElementById('btnToggleSim');
+        const btnOverlayStart = document.getElementById('btnOverlayStart');
+        const startOverlay = document.getElementById('startOverlay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const actionLog = document.getElementById('actionLog');
+
+        const checkboxes = {
+            normal: document.getElementById('condNormal'),
+            type1: document.getElementById('condType1'),
+            type2: document.getElementById('condType2'),
+            fasting: document.getElementById('condFasting')
+        };
+
+        let isRunning = false;
+        let simTimer = null;
+        let timeStep = 0;
+        const SIM_SPEED = 250;
+        const MAX_DATA_POINTS = 100;
+
+        const initialState = {
+            normal: { active: true, glucose: 100, insulin: 10, glucagon: 10, gTarget: 100 },
+            type1: { active: false, glucose: 100, insulin: 5, glucagon: 10, gTarget: 100 },
+            type2: { active: false, glucose: 100, insulin: 10, glucagon: 10, gTarget: 100 },
+            fasting: { active: false, glucose: 90, insulin: 5, glucagon: 15, gTarget: 70 }
+        };
+        let simState = JSON.parse(JSON.stringify(initialState));
+
+        const ctx = document.getElementById('bloodSugarChart').getContext('2d');
+        Chart.defaults.font.family = 'Inter';
+        Chart.defaults.color = '#3d3d3d';
+
+        let chart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true, maintainAspectRatio: false, animation: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 6 } } },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { title: { display: true, text: '농도 (mg/dL / mU/L)' }, min: 0, max: 250, grid: { color: '#e8e8e8' } }
+                }
+            }
+        });
+
+        function formatTime(minutes) {
+            const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+            const m = (minutes % 60).toString().padStart(2, '0');
+            return `${h}:${m}`;
+        }
+
+        function updateSliderDisplay(slider, display, labels) {
+            const val = parseInt(slider.value);
+            if (val <= 30) display.innerText = labels[0];
+            else if (val <= 70) display.innerText = labels[1];
+            else display.innerText = labels[2];
+        }
+        sliderFood.addEventListener('input', () => updateSliderDisplay(sliderFood, displayFood, ["가벼움", "보통", "과식"]));
+        sliderExercise.addEventListener('input', () => updateSliderDisplay(sliderExercise, displayExercise, ["가벼움", "보통", "고강도"]));
+
+        // 학생이 한 행동을 텍스트로 모아 제출 시 함께 보냄
+        let logLines = [];
+        function logAction(msg) {
+            const timeStr = formatTime(timeStep);
+            logLines.push(`[${timeStr}] ${msg}`);
+            const logEl = document.createElement('div');
+            logEl.className = "py-1 border-b border-hp-fog";
+            logEl.innerHTML = `<span class="font-bold text-hp-ink mr-2">[${timeStr}]</span>${msg}`;
+            actionLog.prepend(logEl);
+        }
+
+        function initChartDatasets() {
+            chart.data.labels = [];
+            chart.data.datasets = [];
+
+            if (simState.normal.active) {
+                chart.data.datasets.push({ label: '혈당 (정상)', data: [], borderColor: chartColors.normal.glucose, borderWidth: 2, pointRadius: 0, tension: 0.4 });
+                chart.data.datasets.push({ label: '인슐린 (정상)', data: [], borderColor: chartColors.normal.insulin, borderDash: [5, 5], borderWidth: 2, pointRadius: 0, tension: 0.4 });
+            }
+            if (simState.type1.active) {
+                chart.data.datasets.push({ label: '혈당 (1형 당뇨)', data: [], borderColor: chartColors.type1.glucose, borderWidth: 2, pointRadius: 0, tension: 0.4 });
+                chart.data.datasets.push({ label: '인슐린 (1형)', data: [], borderColor: chartColors.type1.insulin, borderDash: [5, 5], borderWidth: 2, pointRadius: 0, tension: 0.4 });
+            }
+            if (simState.type2.active) {
+                chart.data.datasets.push({ label: '혈당 (2형 당뇨)', data: [], borderColor: chartColors.type2.glucose, borderWidth: 2, pointRadius: 0, tension: 0.4 });
+                chart.data.datasets.push({ label: '인슐린 (2형)', data: [], borderColor: chartColors.type2.insulin, borderDash: [5, 5], borderWidth: 2, pointRadius: 0, tension: 0.4 });
+            }
+            if (simState.fasting.active) {
+                chart.data.datasets.push({ label: '혈당 (공복)', data: [], borderColor: chartColors.fasting.glucose, borderWidth: 2, pointRadius: 0, tension: 0.4 });
+                chart.data.datasets.push({ label: '글루카곤 (공복)', data: [], borderColor: chartColors.fasting.glucagon, borderDash: [2, 2], borderWidth: 2, pointRadius: 0, tension: 0.4 });
+            }
+            chart.update();
+        }
+
+        Object.keys(checkboxes).forEach(key => {
+            checkboxes[key].addEventListener('change', (e) => {
+                simState[key].active = e.target.checked;
+                if (key === 'fasting' && e.target.checked) simState.fasting.gTarget = 60;
+                const wasRunning = isRunning;
+                resetSim(false);
+                if (wasRunning) startSimulation();
+            });
+        });
+
+        function stepSimulation() {
+            if (!isRunning) return;
+            timeStep++;
+            timeDisplay.innerText = formatTime(timeStep);
+            chart.data.labels.push(formatTime(timeStep));
+
+            let dsIndex = 0;
+
+            Object.keys(simState).forEach(key => {
+                if (!simState[key].active) return;
+                let state = simState[key];
+
+                if (state.glucose > state.gTarget) state.glucose -= 0.1;
+                else if (state.glucose < state.gTarget) state.glucose += 0.1;
+                if (key === 'fasting') state.glucose -= 0.05;
+
+                let insulinDemand = Math.max(0, (state.glucose - 100) * 0.3);
+                let glucagonDemand = Math.max(0, (90 - state.glucose) * 0.4);
+
+                if (key === 'type1') { state.insulin = 5; }
+                else if (key === 'type2') { state.insulin += (insulinDemand * 1.5 - state.insulin) * 0.1; }
+                else { state.insulin += (insulinDemand - state.insulin) * 0.1; }
+
+                state.glucagon += (glucagonDemand - state.glucagon) * 0.1;
+
+                if (key === 'type2') { state.glucose -= state.insulin * 0.02; }
+                else { state.glucose -= state.insulin * 0.15; }
+                state.glucose += state.glucagon * 0.1;
+
+                chart.data.datasets[dsIndex++].data.push(state.glucose);
+                if (key === 'fasting') chart.data.datasets[dsIndex++].data.push(state.glucagon);
+                else chart.data.datasets[dsIndex++].data.push(state.insulin);
+            });
+
+            if (chart.data.labels.length > MAX_DATA_POINTS) {
+                chart.data.labels.shift();
+                chart.data.datasets.forEach(ds => ds.data.shift());
+            }
+            chart.update();
+        }
+
+        function handleAction(type) {
+            if (!isRunning) startSimulation();
+            let amount = type === 'eat' ? parseInt(sliderFood.value) : parseInt(sliderExercise.value);
+            const selectedTypes = Array.from(document.querySelectorAll(`input[name="${type === 'eat' ? 'foodType' : 'exType'}"]:checked`)).map(cb => cb.parentElement.innerText.trim());
+
+            if (selectedTypes.length === 0) { showToast('항목을 하나 이상 선택하세요.', 'error'); return; }
+
+            let impact = amount / selectedTypes.length;
+            let totalChange = 0;
+
+            if (type === 'eat') {
+                const values = Array.from(document.querySelectorAll('input[name="foodType"]:checked')).map(cb => cb.value);
+                values.forEach(v => {
+                    if (v === 'carb') totalChange += impact * 1.5;
+                    if (v === 'protein') totalChange += impact * 0.4;
+                    if (v === 'fat') totalChange += impact * 0.1;
+                    if (v === 'veg') totalChange += impact * 0.05;
+                });
+                Object.keys(simState).forEach(key => { if (simState[key].active) simState[key].gTarget += totalChange; });
+                logAction(`🍽️ ${selectedTypes.join(", ")} 섭취`);
+            } else {
+                const values = Array.from(document.querySelectorAll('input[name="exType"]:checked')).map(cb => cb.value);
+                values.forEach(v => {
+                    if (v === 'cardio') totalChange += impact * 1.0;
+                    if (v === 'weight') totalChange += impact * 0.6;
+                });
+                Object.keys(simState).forEach(key => { if (simState[key].active) simState[key].gTarget -= totalChange; });
+                logAction(`🏃 ${selectedTypes.join(", ")} 운동`);
+            }
+        }
+        document.getElementById('btnEat').addEventListener('click', () => handleAction('eat'));
+        document.getElementById('btnExercise').addEventListener('click', () => handleAction('exercise'));
+
+        function startSimulation() {
+            isRunning = true;
+            startOverlay.classList.add('hidden');
+            btnToggleSim.innerText = "일시정지";
+            btnToggleSim.className = "bg-hp-canvas text-hp-ink border border-hp-ink rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[12.6px] px-4 py-2 hover:bg-hp-cloud transition-colors";
+            if (!simTimer) {
+                if (chart.data.datasets.length === 0) initChartDatasets();
+                simTimer = setInterval(stepSimulation, SIM_SPEED);
+            }
+        }
+        function pauseSimulation() {
+            isRunning = false;
+            btnToggleSim.innerText = "재개";
+            btnToggleSim.className = "bg-hp-ink text-white rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[12.6px] px-4 py-2 hover:bg-hp-inkSoft transition-colors";
+        }
+
+        btnOverlayStart.addEventListener('click', startSimulation);
+        btnToggleSim.addEventListener('click', () => isRunning ? pauseSimulation() : startSimulation());
+
+        function resetSim(showOverlay = true) {
+            pauseSimulation();
+            clearInterval(simTimer);
+            simTimer = null;
+            timeStep = 0;
+            timeDisplay.innerText = "00:00";
+
+            const currentActive = {
+                normal: simState.normal.active, type1: simState.type1.active,
+                type2: simState.type2.active, fasting: simState.fasting.active
+            };
+            simState = JSON.parse(JSON.stringify(initialState));
+            simState.normal.active = currentActive.normal;
+            simState.type1.active = currentActive.type1;
+            simState.type2.active = currentActive.type2;
+            simState.fasting.active = currentActive.fasting;
+
+            initChartDatasets();
+            actionLog.innerHTML = '';
+            logLines = [];
+            if (showOverlay) {
+                startOverlay.classList.remove('hidden');
+                btnToggleSim.innerText = "시작";
+                btnToggleSim.className = "bg-hp-ink text-white rounded-[4px] uppercase tracking-[0.7px] font-semibold text-[12.6px] px-4 py-2 hover:bg-hp-inkSoft transition-colors";
+            }
+        }
+        document.getElementById('btnReset').addEventListener('click', () => resetSim(true));
+
+        // === AI 튜터 (Apps Script 경유, API 키 노출 없음) ===
+        const chatbotContainer = document.getElementById('chatbotContainer');
+        const btnOpenChat = document.getElementById('btnOpenChat');
+        const chatInput = document.getElementById('chatInput');
+        const chatHistoryDOM = document.getElementById('chatHistory');
+
+        let chatContext = [];
+
+        btnOpenChat.addEventListener('click', () => { chatbotContainer.classList.remove('hidden'); chatbotContainer.classList.add('flex'); btnOpenChat.classList.add('hidden'); });
+        document.getElementById('closeChat').addEventListener('click', () => { chatbotContainer.classList.add('hidden'); chatbotContainer.classList.remove('flex'); btnOpenChat.classList.remove('hidden'); });
+
+        function appendMessage(text, isUser, id = null) {
+            const div = document.createElement('div');
+            if (id) div.id = id;
+            div.className = `p-3 text-[14px] shadow-sm ${isUser ? "bg-hp-primary text-white rounded-tl-[16px] rounded-tr-[16px] rounded-bl-[16px] self-end max-w-[85%]" : "bg-hp-cloud text-hp-ink rounded-tr-[16px] rounded-br-[16px] rounded-bl-[16px] self-start max-w-[85%]"}`;
+            div.innerText = text;
+            chatHistoryDOM.appendChild(div);
+            chatHistoryDOM.scrollTop = chatHistoryDOM.scrollHeight;
+        }
+
+        async function handleChatSend() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            appendMessage(text, true);
+            chatInput.value = "";
+            chatInput.disabled = true;
+            chatContext.push({ role: "user", parts: [{ text: text }] });
+
+            const loadingId = "load-" + Date.now();
+            appendMessage("생각 중...", false, loadingId);
+
+            try {
+                const data = await callAPI({ action: 'chat', contents: chatContext });
+                document.getElementById(loadingId)?.remove();
+                chatContext.push({ role: "model", parts: [{ text: data.reply }] });
+                appendMessage(data.reply, false);
+            } catch (err) {
+                document.getElementById(loadingId)?.remove();
+                appendMessage("연결에 실패했습니다. 잠시 후 다시 시도해 주세요. (" + err.message + ")", false);
+            } finally {
+                chatInput.disabled = false;
+                chatInput.focus();
+            }
+        }
+        document.getElementById('btnChatSend').addEventListener('click', handleChatSend);
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleChatSend(); });
+
+        // === 제출 (Google Sheets 저장) ===
+        const btnSubmit = document.getElementById('btnSubmit');
+        btnSubmit.addEventListener('click', async () => {
+            const sid = document.getElementById('studentId').value.trim();
+            const sname = document.getElementById('studentName').value.trim();
+            const report = document.getElementById('studentReport').value.trim();
+            const question = document.getElementById('studentQuestion').value.trim();
+
+            const q1 = document.querySelector('input[name="q1"]:checked')?.value;
+            const q2 = document.querySelector('input[name="q2"]:checked')?.value;
+
+            if (!sid || !sname || !report) { showToast("학번, 이름, 결론은 필수 항목입니다.", "error"); return; }
+
+            let score = 0;
+            if (q1 === "2") score += 50;
+            if (q2 === "2") score += 50;
+
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = "제출 중...";
+
+            try {
+                await callAPI({
+                    action: 'submit',
+                    studentId: sid,
+                    studentName: sname,
+                    report: report,
+                    question: question,
+                    score: score,
+                    log: logLines.join(' / ')
+                });
+                showToast("제출이 완료되었습니다.", "success");
+                document.getElementById('studentReport').value = "";
+                document.getElementById('studentQuestion').value = "";
+                document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+            } catch (err) {
+                showToast("제출 실패: " + err.message, "error");
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "선생님께 제출하기";
+            }
+        });
+
+        function showToast(msg, type = "info") {
+            const toast = document.createElement('div');
+            const color = type === "error" ? "bg-hp-error" : type === "success" ? "bg-hp-primary" : "bg-hp-ink";
+            toast.className = `${color} text-white px-6 py-3 rounded-[4px] shadow-modal text-[14px] font-semibold tracking-wide transition-opacity duration-300 flex items-center gap-2`;
+            toast.innerText = msg;
+            document.getElementById('toastContainer').appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        // 페이지 로딩 시 차트 준비
+        initChartDatasets();
+    </script>
+</body>
+</html>
