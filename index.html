@@ -51,9 +51,23 @@
         return auth.currentUser;
       }
 
+      function parseQuizFromLog(log) {
+        const match = String(log || "").match(/\[QUIZ:q1=([123]);q2=([123])\]/);
+        const q1Answer = match?.[1] || "";
+        const q2Answer = match?.[2] || "";
+        return {
+          q1Answer,
+          q2Answer,
+          q1Score: q1Answer === "1" ? 5 : 0,
+          q2Score: q2Answer === "2" ? 5 : 0,
+        };
+      }
+
       function toRow(snapshot) {
         const data = snapshot.data();
         const date = data.createdAt?.toDate?.();
+        const log = data.log || "";
+        const quiz = parseQuizFromLog(log);
         return {
           id: snapshot.id,
           time: date
@@ -62,14 +76,14 @@
           sid: data.studentId || "",
           name: data.studentName || "",
           score: Number(data.score) || 0,
-          q1Answer: String(data.q1Answer || ""),
-          q2Answer: String(data.q2Answer || ""),
-          q1Score: Number(data.q1Score) || 0,
-          q2Score: Number(data.q2Score) || 0,
+          q1Answer: quiz.q1Answer,
+          q2Answer: quiz.q2Answer,
+          q1Score: quiz.q1Score,
+          q2Score: quiz.q2Score,
           report: data.report || "",
           question: data.question || "",
           feedback: data.feedback || "",
-          log: data.log || "",
+          log,
         };
       }
 
@@ -81,10 +95,6 @@
             studentId: String(payload.studentId || "").trim(),
             studentName: String(payload.studentName || "").trim(),
             score: Number(payload.score) || 0,
-            q1Answer: String(payload.q1Answer || ""),
-            q2Answer: String(payload.q2Answer || ""),
-            q1Score: Number(payload.q1Score) || 0,
-            q2Score: Number(payload.q2Score) || 0,
             report: String(payload.report || "").trim(),
             question: String(payload.question || "").trim(),
             log: String(payload.log || ""),
@@ -605,17 +615,17 @@
                   Q1. 식사를 통해 혈당량이 상승했을 때, 혈당을 낮추기 위해
                   분비되는 호르몬과 분비 장소는? (5점)
                 </p>
-                <div class="flex flex-wrap gap-4">
+                <div class="flex flex-col gap-2">
                   <label class="flex items-center gap-2"
-                    ><input type="radio" name="q1" value="1" /> 인슐린
+                    ><input type="radio" name="q1" value="1" /> 1. 인슐린
                     (이자)</label
                   >
                   <label class="flex items-center gap-2"
-                    ><input type="radio" name="q1" value="2" /> 글루카곤
+                    ><input type="radio" name="q1" value="2" /> 2. 글루카곤
                     (간)</label
                   >
                   <label class="flex items-center gap-2"
-                    ><input type="radio" name="q1" value="3" /> 에피네프린
+                    ><input type="radio" name="q1" value="3" /> 3. 에피네프린
                     (부신)</label
                   >
                 </div>
@@ -627,16 +637,16 @@
                 </p>
                 <div class="flex flex-col gap-2">
                   <label class="flex items-center gap-2"
-                    ><input type="radio" name="q2" value="1" /> 인슐린이 전혀
+                    ><input type="radio" name="q2" value="1" /> 1. 인슐린이 전혀
                     분비되지 않는다.</label
                   >
                   <label class="flex items-center gap-2"
-                    ><input type="radio" name="q2" value="2" /> 인슐린은
+                    ><input type="radio" name="q2" value="2" /> 2. 인슐린은
                     분비되지만 표적 세포가 반응하지 않아 혈당이 안
                     떨어진다.</label
                   >
                   <label class="flex items-center gap-2"
-                    ><input type="radio" name="q2" value="3" /> 글루카곤이 과다
+                    ><input type="radio" name="q2" value="3" /> 3. 글루카곤이 과다
                     분비되어 혈당이 오히려 낮아진다.</label
                   >
                 </div>
@@ -1392,11 +1402,7 @@
             report: report,
             question: question,
             score: score,
-            q1Answer: q1,
-            q2Answer: q2,
-            q1Score: q1Score,
-            q2Score: q2Score,
-            log: logLines.join(" / "),
+            log: [`[QUIZ:q1=${q1};q2=${q2}]`, ...logLines].join(" / "),
           });
           showToast(`제출이 완료되었습니다. 형성평가 점수: ${score}/10점`, "success");
           document.getElementById("studentReport").value = "";
