@@ -7,13 +7,22 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+      import {
+        initializeAppCheck,
+        ReCaptchaEnterpriseProvider,
+      } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app-check.js";
+      import {
+        getAI,
+        getGenerativeModel,
+        GoogleAIBackend,
+      } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-ai.js";
       import {
         getAuth,
         signInAnonymously,
         signInWithEmailAndPassword,
         signOut,
-      } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+      } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
       import {
         getFirestore,
         collection,
@@ -25,11 +34,11 @@
         orderBy,
         query,
         serverTimestamp,
-      } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+      } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
       import {
         getFunctions,
         httpsCallable,
-      } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js";
+      } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-functions.js";
 
       /* Firebase 콘솔에서 복사한 웹 앱 설정값으로 교체하세요. */
       const firebaseConfig = {
@@ -43,9 +52,31 @@
 };
 
       const app = initializeApp(firebaseConfig);
+      initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider(
+          "6Lfh028tAAAAAG70qfIE-ePt0pp_hEVlI2ikC14T",
+        ),
+        isTokenAutoRefreshEnabled: true,
+      });
       const auth = getAuth(app);
       const db = getFirestore(app);
       const functions = getFunctions(app, "asia-northeast3");
+      const ai = getAI(app, { backend: new GoogleAIBackend() });
+      const tutorModel = getGenerativeModel(ai, {
+        model: "gemini-3.6-flash",
+        systemInstruction: `
+너는 고등학교 생명과학 수업의 AI 튜터다.
+현재 수업 주제는 혈당량 조절과 항상성이다.
+학생 수준에 맞는 정확하고 친절한 한국어로 답한다.
+먼저 학생이 스스로 생각할 수 있는 짧은 힌트를 주고 핵심 원리를 설명한다.
+인슐린, 글루카곤, 이자, 간, 표적 세포의 관계를 정확히 구분한다.
+제1형 당뇨병과 제2형 당뇨병을 혼동하지 않는다.
+답변은 특별한 요청이 없으면 5문장 이내로 간결하게 작성한다.
+형성평가 정답을 물어도 번호만 말하지 말고 과학적 이유를 함께 설명한다.
+수업과 무관한 질문에는 생명과학 학습 주제로 돌아오도록 안내한다.
+의료 진단이나 치료를 지시하지 않는다.
+        `.trim(),
+      });
       const submissionsRef = collection(db, "submissions");
 
       async function ensureStudentAuth() {
@@ -113,11 +144,26 @@
         },
         async chat(contents) {
           await ensureStudentAuth();
-          const result = await httpsCallable(
-            functions,
-            "chatTutor",
-          )({ contents });
-          return { ok: true, reply: result.data.reply };
+          if (!Array.isArray(contents) || contents.length === 0) {
+            throw new Error("질문 내용이 없습니다.");
+          }
+          if (JSON.stringify(contents).length > 20000) {
+            throw new Error("대화 내용이 너무 깁니다. AI 튜터를 닫았다가 다시 열어주세요.");
+          }
+          const latest = contents[contents.length - 1];
+          const message = latest?.parts?.map((part) => part.text || "").join(" ").trim();
+          if (!message) throw new Error("질문 내용이 없습니다.");
+          const chat = tutorModel.startChat({
+            history: contents.slice(0, -1),
+            generationConfig: {
+              temperature: 0.4,
+              maxOutputTokens: 500,
+            },
+          });
+          const result = await chat.sendMessage(message);
+          const reply = result.response.text().trim();
+          if (!reply) throw new Error("AI 튜터의 응답이 비어 있습니다.");
+          return { ok: true, reply };
         },
         async teacherLogin(email, password) {
           return (await signInWithEmailAndPassword(auth, email, password)).user;
