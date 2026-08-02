@@ -642,6 +642,12 @@
                   <span class="text-[14px]">글루카곤</span>
                 </label>
                 <span class="text-[12px] text-hp-charcoal">혈당 그래프는 항상 표시됩니다.</span>
+                <div class="w-full flex flex-wrap gap-4 pt-1 text-[12px] font-semibold">
+                  <span style="color:#e53935">● 혈당</span>
+                  <span style="color:#1565c0">● 인슐린</span>
+                  <span style="color:#00a152">● 글루카곤</span>
+                  <span class="text-hp-charcoal font-normal">선 모양은 신체 상태를 구분합니다.</span>
+                </div>
               </div>
 
               <div class="flex-1 relative w-full">
@@ -1009,10 +1015,15 @@
 
       // === 시뮬레이터 ===
       const chartColors = {
-        normal: { glucose: "#024ad8", insulin: "#296ef9", glucagon: "#636363" },
-        type1: { glucose: "#b3262b", insulin: "#ff5050", glucagon: "#8b5cf6" },
-        type2: { glucose: "#356373", insulin: "#7fadbe", glucagon: "#d97706" },
-        fasting: { glucose: "#1a1a1a", insulin: "#6b7280", glucagon: "#c2c2c2" },
+        glucose: "#e53935",
+        insulin: "#1565c0",
+        glucagon: "#00a152",
+      };
+      const conditionDash = {
+        normal: [],
+        type1: [12, 5],
+        type2: [3, 4],
+        fasting: [14, 4, 3, 4],
       };
 
       const displayFood = document.getElementById("displayFood");
@@ -1047,28 +1058,32 @@
           glucose: 100,
           insulin: 10,
           glucagon: 10,
-          gTarget: 100,
+          mealLoad: 0,
+          exerciseLoad: 0,
         },
         type1: {
           active: false,
           glucose: 100,
           insulin: 5,
           glucagon: 10,
-          gTarget: 100,
+          mealLoad: 0,
+          exerciseLoad: 0,
         },
         type2: {
           active: false,
           glucose: 100,
           insulin: 10,
           glucagon: 10,
-          gTarget: 100,
+          mealLoad: 0,
+          exerciseLoad: 0,
         },
         fasting: {
           active: false,
           glucose: 90,
           insulin: 5,
           glucagon: 15,
-          gTarget: 70,
+          mealLoad: 0,
+          exerciseLoad: 0,
         },
       };
       let simState = JSON.parse(JSON.stringify(initialState));
@@ -1093,11 +1108,19 @@
           },
           scales: {
             x: { grid: { display: false } },
-            y: {
-              title: { display: true, text: "농도 (mg/dL / mU/L)" },
-              min: 0,
+            yGlucose: {
+              position: "left",
+              title: { display: true, text: "혈당량 (mg/dL)" },
+              min: 40,
               max: 250,
               grid: { color: "#e8e8e8" },
+            },
+            yHormone: {
+              position: "right",
+              title: { display: true, text: "호르몬 상대 농도" },
+              min: 0,
+              max: 60,
+              grid: { drawOnChartArea: false },
             },
           },
         },
@@ -1153,15 +1176,16 @@
           type2: "2형 당뇨",
           fasting: "공복",
         };
-        const addDataset = (key, metric, label, dash = []) => {
+        const addDataset = (key, metric, label) => {
           chart.data.datasets.push({
             label: `${label} (${conditionNames[key]})`,
             data: [],
             stateKey: key,
             metric,
-            borderColor: chartColors[key][metric],
-            borderDash: dash,
-            borderWidth: 2,
+            borderColor: chartColors[metric],
+            borderDash: conditionDash[key],
+            borderWidth: metric === "glucose" ? 3 : 2.5,
+            yAxisID: metric === "glucose" ? "yGlucose" : "yHormone",
             pointRadius: 0,
             tension: 0.4,
           });
@@ -1170,8 +1194,8 @@
         Object.keys(simState).forEach((key) => {
           if (!simState[key].active) return;
           addDataset(key, "glucose", "혈당");
-          if (showInsulin.checked) addDataset(key, "insulin", "인슐린", [5, 5]);
-          if (showGlucagon.checked) addDataset(key, "glucagon", "글루카곤", [2, 2]);
+          if (showInsulin.checked) addDataset(key, "insulin", "인슐린");
+          if (showGlucagon.checked) addDataset(key, "glucagon", "글루카곤");
         });
         chart.update();
       }
@@ -1183,8 +1207,6 @@
       Object.keys(checkboxes).forEach((key) => {
         checkboxes[key].addEventListener("change", (e) => {
           simState[key].active = e.target.checked;
-          if (key === "fasting" && e.target.checked)
-            simState.fasting.gTarget = 60;
           const wasRunning = isRunning;
           resetSim(false);
           if (wasRunning) startSimulation();
@@ -1201,29 +1223,38 @@
           if (!simState[key].active) return;
           let state = simState[key];
 
-          if (state.glucose > state.gTarget) state.glucose -= 0.1;
-          else if (state.glucose < state.gTarget) state.glucose += 0.1;
-          if (key === "fasting") state.glucose -= 0.05;
+          // 한 단계는 생리적 변화가 일어나는 10분을 뜻한다.
+          // 음식의 포도당은 여러 단계에 걸쳐 흡수되고, 운동 효과도 점차 감소한다.
+          const absorbedGlucose = state.mealLoad * 0.14;
+          const exerciseUse = state.exerciseLoad * 0.1;
+          state.mealLoad *= 0.72;
+          state.exerciseLoad *= 0.75;
+          state.glucose += absorbedGlucose - exerciseUse;
 
-          let insulinDemand = Math.max(0, (state.glucose - 100) * 0.3);
-          let glucagonDemand = Math.max(0, (90 - state.glucose) * 0.4);
-
+          // 혈당 상승은 이자 베타세포의 인슐린 분비를 촉진한다.
+          // 제1형은 분비가 매우 적고, 제2형은 보상적으로 많이 분비되지만 작용은 약하다.
+          const insulinTarget = Math.min(55, 5 + Math.max(0, state.glucose - 90) * 0.55);
           if (key === "type1") {
-            state.insulin = 5;
+            state.insulin += (1.5 - state.insulin) * 0.45;
           } else if (key === "type2") {
-            state.insulin += (insulinDemand * 1.5 - state.insulin) * 0.1;
+            state.insulin += (Math.min(60, insulinTarget * 1.25) - state.insulin) * 0.4;
           } else {
-            state.insulin += (insulinDemand - state.insulin) * 0.1;
+            state.insulin += (insulinTarget - state.insulin) * 0.4;
           }
 
-          state.glucagon += (glucagonDemand - state.glucagon) * 0.1;
+          // 높은 혈당에서는 글루카곤 분비가 억제되고, 낮은 혈당에서는 증가한다.
+          const glucagonTarget = Math.max(2, Math.min(55, 8 + (90 - state.glucose) * 0.65));
+          state.glucagon += (glucagonTarget - state.glucagon) * 0.35;
 
-          if (key === "type2") {
-            state.glucose -= state.insulin * 0.02;
-          } else {
-            state.glucose -= state.insulin * 0.15;
-          }
-          state.glucose += state.glucagon * 0.1;
+          const insulinEffectiveness = key === "type2" ? 0.045 : 0.13;
+          const effectiveInsulin = key === "type1" ? state.insulin * 0.35 : state.insulin;
+          state.glucose -= Math.max(0, effectiveInsulin - 4) * insulinEffectiveness;
+          state.glucose += Math.max(0, state.glucagon - 7) * 0.075;
+
+          // 식사·운동 자극이 사라지면 간의 완충 작용으로 기준 혈당에 서서히 접근한다.
+          const baseline = key === "fasting" ? 82 : 100;
+          state.glucose += (baseline - state.glucose) * 0.025;
+          state.glucose = Math.max(45, Math.min(240, state.glucose));
 
         });
 
@@ -1269,7 +1300,7 @@
             if (v === "veg") totalChange += impact * 0.05;
           });
           Object.keys(simState).forEach((key) => {
-            if (simState[key].active) simState[key].gTarget += totalChange;
+            if (simState[key].active) simState[key].mealLoad += totalChange;
           });
           logAction(`🍽️ ${selectedTypes.join(", ")} 섭취`);
         } else {
@@ -1281,7 +1312,7 @@
             if (v === "weight") totalChange += impact * 0.6;
           });
           Object.keys(simState).forEach((key) => {
-            if (simState[key].active) simState[key].gTarget -= totalChange;
+            if (simState[key].active) simState[key].exerciseLoad += totalChange;
           });
           logAction(`🏃 ${selectedTypes.join(", ")} 운동`);
         }
