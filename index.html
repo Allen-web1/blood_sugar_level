@@ -614,7 +614,7 @@
                     class="text-[18px] font-medium text-hp-charcoal font-mono bg-hp-cloud px-3 py-1 rounded-[4px]"
                     id="timeDisplay"
                   >
-                    00:00
+                    0분
                   </div>
                   <button
                     id="btnToggleSim"
@@ -1050,7 +1050,7 @@
       let timeStep = 0;
       const SIM_SPEED = 1000;
       const SIM_MINUTES_PER_STEP = 10;
-      const MAX_DATA_POINTS = 100;
+      const MAX_DATA_POINTS = 19;
 
       const initialState = {
         normal: {
@@ -1118,7 +1118,7 @@
           const { ctx, chartArea, scales } = chartInstance;
           if (!chartArea || !scales.x) return;
           mealEvents.forEach((eventTime) => {
-            const label = formatTime(eventTime);
+            const label = `${eventTime}분`;
             const labelIndex = chartInstance.data.labels.indexOf(label);
             if (labelIndex < 0) return;
             const x = scales.x.getPixelForValue(labelIndex);
@@ -1155,7 +1155,16 @@
             },
           },
           scales: {
-            x: { grid: { display: false } },
+            x: {
+              title: { display: true, text: "경과 시간(10분 간격)" },
+              grid: { display: false },
+              ticks: {
+                autoSkip: false,
+                maxRotation: 45,
+                minRotation: 45,
+                font: { size: 10 },
+              },
+            },
             yGlucose: {
               position: "left",
               title: { display: true, text: "혈당량 (mg/dL)" },
@@ -1215,7 +1224,7 @@
       }
 
       function initChartDatasets() {
-        chart.data.labels = [];
+        chart.data.labels = ["0분"];
         chart.data.datasets = [];
 
         const conditionNames = {
@@ -1227,7 +1236,7 @@
         const addDataset = (key, metric, label) => {
           chart.data.datasets.push({
             label: `${label} (${conditionNames[key]})`,
-            data: [],
+            data: [simState[key][metric]],
             stateKey: key,
             metric,
             borderColor: chartColors[metric],
@@ -1264,8 +1273,8 @@
       function stepSimulation() {
         if (!isRunning) return;
         timeStep += SIM_MINUTES_PER_STEP;
-        timeDisplay.innerText = formatTime(timeStep);
-        chart.data.labels.push(formatTime(timeStep));
+        timeDisplay.innerText = `${timeStep}분`;
+        chart.data.labels.push(`${timeStep}분`);
 
         Object.keys(simState).forEach((key) => {
           if (!simState[key].active) return;
@@ -1350,8 +1359,8 @@
           Object.keys(simState).forEach((key) => {
             if (!simState[key].active) return;
             // 식사 직후 장에서 포도당이 빠르게 흡수되어 혈당 스파이크가 시작된다.
-            simState[key].glucose += totalChange * 0.42;
-            simState[key].mealLoad += totalChange * 0.9;
+            simState[key].glucose += totalChange * 0.5;
+            simState[key].mealLoad += totalChange * 0.85;
           });
           mealEvents.push(timeStep + SIM_MINUTES_PER_STEP);
           logAction(`🍽️ ${selectedTypes.join(", ")} 섭취`);
@@ -1404,7 +1413,7 @@
         clearInterval(simTimer);
         simTimer = null;
         timeStep = 0;
-        timeDisplay.innerText = "00:00";
+        timeDisplay.innerText = "0분";
 
         const currentActive = {
           normal: simState.normal.active,
