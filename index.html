@@ -1055,45 +1055,93 @@
       const initialState = {
         normal: {
           active: true,
-          glucose: 100,
-          insulin: 10,
-          glucagon: 10,
+          glucose: 95,
+          insulin: 5,
+          glucagon: 8,
           mealLoad: 0,
           exerciseLoad: 0,
         },
         type1: {
           active: false,
-          glucose: 100,
-          insulin: 5,
-          glucagon: 10,
+          glucose: 180,
+          insulin: 1.5,
+          glucagon: 8,
           mealLoad: 0,
           exerciseLoad: 0,
         },
         type2: {
           active: false,
-          glucose: 100,
-          insulin: 10,
-          glucagon: 10,
+          glucose: 145,
+          insulin: 18,
+          glucagon: 8,
           mealLoad: 0,
           exerciseLoad: 0,
         },
         fasting: {
           active: false,
-          glucose: 90,
-          insulin: 5,
+          glucose: 85,
+          insulin: 3,
           glucagon: 15,
           mealLoad: 0,
           exerciseLoad: 0,
         },
       };
       let simState = JSON.parse(JSON.stringify(initialState));
+      let mealEvents = [];
 
       const ctx = document.getElementById("bloodSugarChart").getContext("2d");
       Chart.defaults.font.family = "Inter";
       Chart.defaults.color = "#3d3d3d";
 
+      const referenceGuidePlugin = {
+        id: "referenceGuide",
+        beforeDatasetsDraw(chartInstance) {
+          const { ctx, chartArea, scales } = chartInstance;
+          if (!chartArea || !scales.yGlucose) return;
+          const y140 = scales.yGlucose.getPixelForValue(140);
+          const y70 = scales.yGlucose.getPixelForValue(70);
+          ctx.save();
+          ctx.fillStyle = "rgba(148, 163, 184, 0.20)";
+          ctx.fillRect(chartArea.left, y140, chartArea.right - chartArea.left, y70 - y140);
+          ctx.strokeStyle = "rgba(71, 85, 105, 0.75)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(chartArea.left, y140);
+          ctx.lineTo(chartArea.right, y140);
+          ctx.stroke();
+          ctx.fillStyle = "#475569";
+          ctx.font = "600 12px Inter";
+          ctx.fillText("정상 혈당 범위", chartArea.left + 8, y140 + 17);
+          ctx.restore();
+        },
+        afterDatasetsDraw(chartInstance) {
+          const { ctx, chartArea, scales } = chartInstance;
+          if (!chartArea || !scales.x) return;
+          mealEvents.forEach((eventTime) => {
+            const label = formatTime(eventTime);
+            const labelIndex = chartInstance.data.labels.indexOf(label);
+            if (labelIndex < 0) return;
+            const x = scales.x.getPixelForValue(labelIndex);
+            ctx.save();
+            ctx.strokeStyle = "rgba(71, 85, 105, 0.65)";
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x, chartArea.top);
+            ctx.lineTo(x, chartArea.bottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = "#334155";
+            ctx.font = "700 12px Inter";
+            ctx.textAlign = "center";
+            ctx.fillText("식사", x, chartArea.bottom - 8);
+            ctx.restore();
+          });
+        },
+      };
+
       let chart = new Chart(ctx, {
         type: "line",
+        plugins: [referenceGuidePlugin],
         data: { labels: [], datasets: [] },
         options: {
           responsive: true,
@@ -1112,7 +1160,7 @@
               position: "left",
               title: { display: true, text: "혈당량 (mg/dL)" },
               min: 40,
-              max: 250,
+              max: 260,
               grid: { color: "#e8e8e8" },
             },
             yHormone: {
@@ -1246,13 +1294,13 @@
           const glucagonTarget = Math.max(2, Math.min(55, 8 + (90 - state.glucose) * 0.65));
           state.glucagon += (glucagonTarget - state.glucagon) * 0.35;
 
-          const insulinEffectiveness = key === "type2" ? 0.045 : 0.13;
+          const insulinEffectiveness = key === "type2" ? 0.045 : 0.22;
           const effectiveInsulin = key === "type1" ? state.insulin * 0.35 : state.insulin;
           state.glucose -= Math.max(0, effectiveInsulin - 4) * insulinEffectiveness;
           state.glucose += Math.max(0, state.glucagon - 7) * 0.075;
 
           // 식사·운동 자극이 사라지면 간의 완충 작용으로 기준 혈당에 서서히 접근한다.
-          const baseline = key === "fasting" ? 82 : 100;
+          const baseline = key === "fasting" ? 82 : key === "type1" ? 180 : key === "type2" ? 145 : 95;
           state.glucose += (baseline - state.glucose) * 0.025;
           state.glucose = Math.max(45, Math.min(240, state.glucose));
 
@@ -1300,8 +1348,12 @@
             if (v === "veg") totalChange += impact * 0.05;
           });
           Object.keys(simState).forEach((key) => {
-            if (simState[key].active) simState[key].mealLoad += totalChange;
+            if (!simState[key].active) return;
+            // 식사 직후 장에서 포도당이 빠르게 흡수되어 혈당 스파이크가 시작된다.
+            simState[key].glucose += totalChange * 0.42;
+            simState[key].mealLoad += totalChange * 0.9;
           });
+          mealEvents.push(timeStep + SIM_MINUTES_PER_STEP);
           logAction(`🍽️ ${selectedTypes.join(", ")} 섭취`);
         } else {
           const values = Array.from(
@@ -1369,6 +1421,7 @@
         initChartDatasets();
         actionLog.innerHTML = "";
         logLines = [];
+        mealEvents = [];
         if (showOverlay) {
           startOverlay.classList.remove("hidden");
           btnToggleSim.innerText = "시작";
