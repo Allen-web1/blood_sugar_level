@@ -603,7 +603,7 @@
 
           <div class="lg:col-span-8 flex flex-col gap-6">
             <div
-              class="bg-hp-canvas rounded-[16px] p-6 shadow-soft border border-hp-fog relative w-full h-[500px] flex flex-col"
+              class="bg-hp-canvas rounded-[16px] p-6 shadow-soft border border-hp-fog relative w-full h-[590px] flex flex-col"
             >
               <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[24px] font-medium text-hp-ink">
@@ -642,11 +642,24 @@
                   <span class="text-[14px]">글루카곤</span>
                 </label>
                 <span class="text-[12px] text-hp-charcoal">혈당 그래프는 항상 표시됩니다.</span>
-                <div class="w-full flex flex-wrap gap-4 pt-1 text-[12px] font-semibold">
-                  <span style="color:#e53935">● 혈당</span>
-                  <span style="color:#1565c0">● 인슐린</span>
-                  <span style="color:#00a152">● 글루카곤</span>
-                  <span class="text-hp-charcoal font-normal">선 모양은 신체 상태를 구분합니다.</span>
+                <div class="w-full grid grid-cols-1 xl:grid-cols-2 gap-3 pt-2 text-[12px]">
+                  <div class="bg-white border border-hp-fog rounded-[6px] p-3">
+                    <div class="font-bold text-hp-ink mb-2">① 색깔 = 측정 항목</div>
+                    <div class="flex flex-wrap gap-x-5 gap-y-2 font-semibold">
+                      <span class="flex items-center gap-2"><span class="inline-block w-10 border-t-[4px]" style="border-color:#e53935"></span>혈당</span>
+                      <span class="flex items-center gap-2"><span class="inline-block w-10 border-t-[4px]" style="border-color:#1565c0"></span>인슐린</span>
+                      <span class="flex items-center gap-2"><span class="inline-block w-10 border-t-[4px]" style="border-color:#00a152"></span>글루카곤</span>
+                    </div>
+                  </div>
+                  <div class="bg-white border border-hp-fog rounded-[6px] p-3">
+                    <div class="font-bold text-hp-ink mb-2">② 선 모양 = 신체 상태</div>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 font-semibold">
+                      <span class="flex items-center gap-2"><svg width="44" height="8"><line x1="1" y1="4" x2="43" y2="4" stroke="#3d3d3d" stroke-width="3"/></svg>정상</span>
+                      <span class="flex items-center gap-2"><svg width="44" height="8"><line x1="1" y1="4" x2="43" y2="4" stroke="#3d3d3d" stroke-width="3" stroke-dasharray="12 5"/></svg>제1형 당뇨</span>
+                      <span class="flex items-center gap-2"><svg width="44" height="8"><line x1="1" y1="4" x2="43" y2="4" stroke="#3d3d3d" stroke-width="3" stroke-dasharray="3 4"/></svg>제2형 당뇨</span>
+                      <span class="flex items-center gap-2"><svg width="44" height="8"><line x1="1" y1="4" x2="43" y2="4" stroke="#3d3d3d" stroke-width="3" stroke-dasharray="14 4 3 4"/></svg>공복</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1150,8 +1163,13 @@
           interaction: { mode: "index", intersect: false },
           plugins: {
             legend: {
-              position: "top",
-              labels: { usePointStyle: true, boxWidth: 6 },
+              display: false,
+            },
+            tooltip: {
+              callbacks: {
+                title: (items) => `경과 시간: ${items[0]?.label || ""}`,
+                label: (item) => `${item.dataset.label}: ${Number(item.raw).toFixed(1)}`,
+              },
             },
           },
           scales: {
