@@ -93,7 +93,7 @@
       }
 
       function parseQuizFromLog(log) {
-        const match = String(log || "").match(/\[QUIZ:q1=([123]);q2=([123])\]/);
+        const match = String(log || "").match(/\[QUIZ:q1=([1-5]);q2=([1-5])\]/);
         const q1Answer = match?.[1] || "";
         const q2Answer = match?.[2] || "";
         return {
@@ -631,6 +631,19 @@
                 </div>
               </div>
 
+              <div class="flex flex-wrap items-center gap-4 mb-4 p-3 bg-hp-cloud rounded-[8px]">
+                <span class="text-[14px] font-semibold text-hp-ink">함께 볼 호르몬</span>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="showInsulin" checked />
+                  <span class="text-[14px]">인슐린</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="showGlucagon" checked />
+                  <span class="text-[14px]">글루카곤</span>
+                </label>
+                <span class="text-[12px] text-hp-charcoal">혈당 그래프는 항상 표시됩니다.</span>
+              </div>
+
               <div class="flex-1 relative w-full">
                 <canvas id="bloodSugarChart"></canvas>
                 <div
@@ -692,6 +705,14 @@
                     ><input type="radio" name="q1" value="3" /> 3. 에피네프린
                     (부신)</label
                   >
+                  <label class="flex items-center gap-2"
+                    ><input type="radio" name="q1" value="4" /> 4. 티록신
+                    (갑상샘)</label
+                  >
+                  <label class="flex items-center gap-2"
+                    ><input type="radio" name="q1" value="5" /> 5. 항이뇨 호르몬
+                    (뇌하수체 후엽)</label
+                  >
                 </div>
               </div>
               <div class="quiz-q">
@@ -712,6 +733,14 @@
                   <label class="flex items-center gap-2"
                     ><input type="radio" name="q2" value="3" /> 3. 글루카곤이 과다
                     분비되어 혈당이 오히려 낮아진다.</label
+                  >
+                  <label class="flex items-center gap-2"
+                    ><input type="radio" name="q2" value="4" /> 4. 표적 세포의
+                    인슐린 반응성이 높아져 혈당이 정상보다 빠르게 낮아진다.</label
+                  >
+                  <label class="flex items-center gap-2"
+                    ><input type="radio" name="q2" value="5" /> 5. 탄수화물이
+                    흡수되지 않아 식후에도 혈당량이 전혀 변하지 않는다.</label
                   >
                 </div>
               </div>
@@ -981,9 +1010,9 @@
       // === 시뮬레이터 ===
       const chartColors = {
         normal: { glucose: "#024ad8", insulin: "#296ef9", glucagon: "#636363" },
-        type1: { glucose: "#b3262b", insulin: "#ff5050" },
-        type2: { glucose: "#356373", insulin: "#7fadbe" },
-        fasting: { glucose: "#1a1a1a", glucagon: "#c2c2c2" },
+        type1: { glucose: "#b3262b", insulin: "#ff5050", glucagon: "#8b5cf6" },
+        type2: { glucose: "#356373", insulin: "#7fadbe", glucagon: "#d97706" },
+        fasting: { glucose: "#1a1a1a", insulin: "#6b7280", glucagon: "#c2c2c2" },
       };
 
       const displayFood = document.getElementById("displayFood");
@@ -995,6 +1024,8 @@
       const startOverlay = document.getElementById("startOverlay");
       const timeDisplay = document.getElementById("timeDisplay");
       const actionLog = document.getElementById("actionLog");
+      const showInsulin = document.getElementById("showInsulin");
+      const showGlucagon = document.getElementById("showGlucagon");
 
       const checkboxes = {
         normal: document.getElementById("condNormal"),
@@ -1006,7 +1037,8 @@
       let isRunning = false;
       let simTimer = null;
       let timeStep = 0;
-      const SIM_SPEED = 250;
+      const SIM_SPEED = 1000;
+      const SIM_MINUTES_PER_STEP = 10;
       const MAX_DATA_POINTS = 100;
 
       const initialState = {
@@ -1115,84 +1147,38 @@
         chart.data.labels = [];
         chart.data.datasets = [];
 
-        if (simState.normal.active) {
+        const conditionNames = {
+          normal: "정상",
+          type1: "1형 당뇨",
+          type2: "2형 당뇨",
+          fasting: "공복",
+        };
+        const addDataset = (key, metric, label, dash = []) => {
           chart.data.datasets.push({
-            label: "혈당 (정상)",
+            label: `${label} (${conditionNames[key]})`,
             data: [],
-            borderColor: chartColors.normal.glucose,
+            stateKey: key,
+            metric,
+            borderColor: chartColors[key][metric],
+            borderDash: dash,
             borderWidth: 2,
             pointRadius: 0,
             tension: 0.4,
           });
-          chart.data.datasets.push({
-            label: "인슐린 (정상)",
-            data: [],
-            borderColor: chartColors.normal.insulin,
-            borderDash: [5, 5],
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.4,
-          });
-        }
-        if (simState.type1.active) {
-          chart.data.datasets.push({
-            label: "혈당 (1형 당뇨)",
-            data: [],
-            borderColor: chartColors.type1.glucose,
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.4,
-          });
-          chart.data.datasets.push({
-            label: "인슐린 (1형)",
-            data: [],
-            borderColor: chartColors.type1.insulin,
-            borderDash: [5, 5],
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.4,
-          });
-        }
-        if (simState.type2.active) {
-          chart.data.datasets.push({
-            label: "혈당 (2형 당뇨)",
-            data: [],
-            borderColor: chartColors.type2.glucose,
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.4,
-          });
-          chart.data.datasets.push({
-            label: "인슐린 (2형)",
-            data: [],
-            borderColor: chartColors.type2.insulin,
-            borderDash: [5, 5],
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.4,
-          });
-        }
-        if (simState.fasting.active) {
-          chart.data.datasets.push({
-            label: "혈당 (공복)",
-            data: [],
-            borderColor: chartColors.fasting.glucose,
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.4,
-          });
-          chart.data.datasets.push({
-            label: "글루카곤 (공복)",
-            data: [],
-            borderColor: chartColors.fasting.glucagon,
-            borderDash: [2, 2],
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.4,
-          });
-        }
+        };
+
+        Object.keys(simState).forEach((key) => {
+          if (!simState[key].active) return;
+          addDataset(key, "glucose", "혈당");
+          if (showInsulin.checked) addDataset(key, "insulin", "인슐린", [5, 5]);
+          if (showGlucagon.checked) addDataset(key, "glucagon", "글루카곤", [2, 2]);
+        });
         chart.update();
       }
+
+      [showInsulin, showGlucagon].forEach((control) => {
+        control.addEventListener("change", () => initChartDatasets());
+      });
 
       Object.keys(checkboxes).forEach((key) => {
         checkboxes[key].addEventListener("change", (e) => {
@@ -1207,11 +1193,9 @@
 
       function stepSimulation() {
         if (!isRunning) return;
-        timeStep++;
+        timeStep += SIM_MINUTES_PER_STEP;
         timeDisplay.innerText = formatTime(timeStep);
         chart.data.labels.push(formatTime(timeStep));
-
-        let dsIndex = 0;
 
         Object.keys(simState).forEach((key) => {
           if (!simState[key].active) return;
@@ -1241,10 +1225,10 @@
           }
           state.glucose += state.glucagon * 0.1;
 
-          chart.data.datasets[dsIndex++].data.push(state.glucose);
-          if (key === "fasting")
-            chart.data.datasets[dsIndex++].data.push(state.glucagon);
-          else chart.data.datasets[dsIndex++].data.push(state.insulin);
+        });
+
+        chart.data.datasets.forEach((dataset) => {
+          dataset.data.push(simState[dataset.stateKey][dataset.metric]);
         });
 
         if (chart.data.labels.length > MAX_DATA_POINTS) {
